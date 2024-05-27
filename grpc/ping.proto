@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package grpc;
+
+// All rpc response for telegram are string directly send to the user
+// I dont want to do more processing on master
+
+option go_package = "github.com/homelab-bot/grpc";
+
+service GreetingService	{
+	rpc Ping (PingRequest) returns (PongResponse) {}
+}
+
+message PingRequest {
+	string name = 1;
+}
+
+message PongResponse {
+	string message = 1;
+}
+
+

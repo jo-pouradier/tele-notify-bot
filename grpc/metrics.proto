@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package grpc;
+
+// All rpc response for telegram are string directly send to the user
+// I dont want to do more processing on master
+
+option go_package = "github.com/homelab-bot/grpc";
+
+service MetricsService {
+	rpc Metrics (Empty) returns (MetricsAllResponse) {}
+}
+
+message MetricsAllResponse {
+	string metrics = 1;
+}
+
+message Empty {}
