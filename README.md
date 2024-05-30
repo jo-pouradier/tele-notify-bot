@@ -10,5 +10,10 @@ Create a Master-Agent pattern communicating by gRPC in golang. Why ? Because I k
 
 ## Plan
 
-1. Create the agent with the gRPC communication, may test with python scripts.
-    Note that these agents will be **gRPC servers** and the master will send requests to them. 
+- [ ] Create the agent with the gRPC communication, may test with python scripts.
+   > Note that these agents will be **gRPC servers** and the master will send requests to them. 
+- [ ] Connect agent to the master so he can know who is connected. (gave custom name or hostname)
+- [ ] Create the bot commands via the master.
+- [ ] System to have command with steps: /metrics -> which server ? Master send new buttons to select by the user, just like botFather with bot management.
+
+- [ ] How to easily manage commands/function associated ? map ? objects ?
