@@ -7,11 +7,11 @@ import (
 	pb "github.com/jo-pouradier/homelab-bot/grpc"
 )
 
-type PingServer struct {
+type PingServerImpl struct {
 	pb.UnimplementedGreetingServiceServer
 }
 
-func (s *PingServer) Ping(ctx context.Context, in *pb.PingRequest) (*pb.PongResponse, error) {
+func (s *PingServerImpl) Ping(ctx context.Context, in *pb.PingRequest) (*pb.PongResponse, error) {
 	log.Printf("Received: %v", in.GetName())
 	message := "What did you send me ?"
 	if in.GetName() == "ping" {
