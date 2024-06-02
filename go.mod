@@ -3,7 +3,7 @@ module github.com/jo-pouradier/homelab-bot
 go 1.22.3
 
 require (
-	github.com/go-telegram-bot-api/telegram-bot-api/v5 v5.5.1
+	github.com/go-telegram/bot v1.4.0
 	github.com/joho/godotenv v1.5.1
 	github.com/shirou/gopsutil/v3 v3.24.4
 	google.golang.org/grpc v1.64.0

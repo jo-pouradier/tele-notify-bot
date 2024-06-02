@@ -1,11 +1,15 @@
 package master
 
 import (
+	"context"
+	"fmt"
 	"log"
 	"os"
+	"os/signal"
 	"strconv"
 
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"github.com/go-telegram/bot"
+	"github.com/go-telegram/bot/models"
 	"google.golang.org/grpc"
 )
 
@@ -17,95 +21,70 @@ type Master interface {
 }
 
 type MasterImpl struct {
-	conns  map[string]grpc.ClientConn
-	botApi *tgbotapi.BotAPI
+	conns map[string]grpc.ClientConn
+	// bot *tgbotapi.BotAPI
+	b      *bot.Bot
 	admins []int
 	// all commands and there actions
-	commands map[string]func(tgbotapi.Update) string
+	commands map[string]bot.HandlerFunc
 }
 
 func NewMaster(debug bool) *MasterImpl {
-	bot, err := tgbotapi.NewBotAPI(os.Getenv("TELEGRAM_TOCKEN"))
-	if err != nil {
-		log.Panic("Telegram key not found")
+	opts := []bot.Option{
+		bot.WithDefaultHandler(handlerDef),
 	}
-	id, err := strconv.Atoi(os.Getenv("ADMIN_USER"))
-	log.Printf("admin: %d", id)
+	if debug {
+		opts = append(opts, bot.WithDebug())
+	}
+	b, err := bot.New(os.Getenv("TELEGRAM_TOCKEN"), opts...)
 
+	if err != nil {
+		log.Panicf("Error while connecting to bot: %v", err)
+	}
+
+	id, err := strconv.Atoi(os.Getenv("ADMIN_USER"))
 	if err != nil {
 		log.Fatal("Admin user Not found, add Env variale : ADMIN_USER")
 	}
-	if err != nil {
-		log.Panic("Error with ADMIN env ID")
+
+	ctx := context.Background()
+	name, _ := b.GetMyName(ctx, &bot.GetMyNameParams{})
+	log.Printf("Authorized on account %s", name)
+
+	commands := map[string]bot.HandlerFunc{
+		"metrics": ProcessMetrics,
 	}
 
-	bot.Debug = debug
-
-	log.Printf("Authorized on account %s", bot.Self.UserName)
-
-	commands := map[string]func(tgbotapi.Update) string{
-		"metrics": ProcessMetrics,
+	for k, v := range commands {
+		b.RegisterHandler(bot.HandlerTypeMessageText, fmt.Sprintf("/%s", k), bot.MatchTypeExact, v)
 	}
 
 	return &MasterImpl{
 		commands: commands,
-		botApi:   bot,
+		b:        b,
 		admins:   []int{id},
 	}
 
 }
 
+func handlerDef(ctx context.Context, b *bot.Bot, update *models.Update) {
+	b.SendMessage(ctx, &bot.SendMessageParams{
+		ChatID: update.Message.Chat.ID,
+		Text:   update.Message.Text,
+	})
+}
+
 func (m *MasterImpl) Serve() {
-	// m.setCommands()
-
-	u := tgbotapi.NewUpdate(0)
-	u.Timeout = 60
-
-	updates := m.botApi.GetUpdatesChan(u)
-
-	for update := range updates {
-		if update.Message != nil { // If we got a message
-			str := m.processMessage(update)
-			msg := tgbotapi.NewMessage(update.Message.Chat.ID, str)
-			m.botApi.Send(msg)
-		}
-	}
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer cancel()
+	m.b.Start(ctx)
 }
 
-// func (m *MasterImpl) setCommands() {
-// 	var cmds = []string{}
-// 	for k := range m.commands {
-// 		cmds = append(cmds, k)
-// 	}
-// 	m.botApi
-// }
-
-func (m *MasterImpl) processMessage(u tgbotapi.Update) string {
-	// check user ID
-	fromID := int(u.SentFrom().ID)
-	for _, id := range m.admins {
-		if fromID == id {
-			continue
-		} else {
-			log.Printf("Got message from unauthorized %d", fromID)
-			return "Your are not authorized"
-		}
-	}
-
-	// check if command
-	if !u.Message.IsCommand() {
-		return "Only commands are accepted"
-	}
-
-	return m.commands[u.Message.Command()](u)
-
-}
-
-func ProcessMetrics(u tgbotapi.Update) string {
-	// m := pb.NewMetricsServiceClient(m.conns)
-	// metricsCtx, metricsCancel := context.WithTimeout(context.Background(), 3*time.Second)
-	// defer metricsCancel()
-	// metrics, _ := m.Metrics(metricsCtx, &pb.Empty{})
-	// log.Printf("get metrics: %s", metrics)
-	return "metrics..."
+func ProcessMetrics(ctx context.Context, b *bot.Bot, update *models.Update) {
+	b.SendMessage(ctx, &bot.SendMessageParams{
+		ChatID: update.Message.Chat.ID,
+		// Text:      "*" + bot.EscapeMarkdown("metrics...*ok*") + "*",
+		Text:      "metrics ok",
+		ParseMode: models.ParseModeMarkdown,
+	})
 }
