@@ -17,3 +17,7 @@ Create a Master-Agent pattern communicating by gRPC in golang. Why ? Because I k
 - [ ] System to have command with steps: /metrics -> which server ? Master send new buttons to select by the user, just like botFather with bot management.
 
 - [ ] How to easily manage commands/function associated ? map ? objects ?
+
+## Interactions
+
+The combinations of menu button (a list of all commands available) and of keyboard button when multiple choices are possible. The usage of CallbackQueries is to set parameters or anything that doesnt need a chat response.

@@ -32,6 +32,7 @@ type MasterImpl struct {
 func NewMaster(debug bool) *MasterImpl {
 	opts := []bot.Option{
 		bot.WithDefaultHandler(handlerDef),
+		bot.WithCallbackQueryDataHandler("TESTING", bot.MatchTypeExact, handlerCallback),
 	}
 	if debug {
 		opts = append(opts, bot.WithDebug())
@@ -52,12 +53,21 @@ func NewMaster(debug bool) *MasterImpl {
 	log.Printf("Authorized on account %s", name)
 
 	commands := map[string]bot.HandlerFunc{
-		"metrics": ProcessMetrics,
+		"metrics":  ProcessMetrics,
+		"test":     TestCommand1,
+		"keyboard": TestKeyboardButton,
 	}
 
 	for k, v := range commands {
 		b.RegisterHandler(bot.HandlerTypeMessageText, fmt.Sprintf("/%s", k), bot.MatchTypeExact, v)
 	}
+	b.SetMyCommands(ctx, &bot.SetMyCommandsParams{
+		Commands: []models.BotCommand{
+			{Command: "metrics", Description: "get server metrics"},
+			{Command: "test", Description: "just a test"},
+			{Command: "keyboard", Description: "get keyboard buttons"},
+		},
+	})
 
 	return &MasterImpl{
 		commands: commands,
@@ -68,13 +78,37 @@ func NewMaster(debug bool) *MasterImpl {
 }
 
 func handlerDef(ctx context.Context, b *bot.Bot, update *models.Update) {
+	log.Printf("Update: %v", update)
+	mess := update.Message
+	if mess == nil {
+		log.Printf("No message: %+v", update.Message)
+		return
+	}
+	id := update.Message.Chat.ID
+	if id == 0 {
+		log.Printf("Get nil chat id: %v", id)
+		id = 2
+	}
+	msg := update.Message.Text
+	if len(msg) == 0 {
+		msg = "did not send a message"
+	}
 	b.SendMessage(ctx, &bot.SendMessageParams{
 		ChatID: update.Message.Chat.ID,
-		Text:   update.Message.Text,
+		Text:   msg,
+	})
+}
+
+func handlerCallback(ctx context.Context, b *bot.Bot, update *models.Update) {
+	b.AnswerCallbackQuery(ctx, &bot.AnswerCallbackQueryParams{
+		CallbackQueryID: update.CallbackQuery.ID,
+		Text:            "ok",
+		// ShowAlert:       true,
 	})
 }
 
 func (m *MasterImpl) Serve() {
+	m.SetMenuButtons()
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
 	m.b.Start(ctx)
@@ -87,4 +121,55 @@ func ProcessMetrics(ctx context.Context, b *bot.Bot, update *models.Update) {
 		Text:      "metrics ok",
 		ParseMode: models.ParseModeMarkdown,
 	})
+}
+
+func TestCommand1(ctx context.Context, b *bot.Bot, update *models.Update) {
+	b.SendMessage(ctx, &bot.SendMessageParams{
+		ChatID: update.Message.Chat.ID,
+		Text:   "here are buttons",
+		ReplyMarkup: models.InlineKeyboardMarkup{
+			InlineKeyboard: [][]models.InlineKeyboardButton{
+				{
+					{
+						Text:         "testing",
+						CallbackData: "TESTING",
+					},
+				},
+			},
+		},
+	})
+}
+
+func TestKeyboardButton(ctx context.Context, b *bot.Bot, update *models.Update) {
+	b.SendMessage(ctx, &bot.SendMessageParams{
+		ChatID: update.Message.Chat.ID,
+		Text:   "here are buttons",
+		ReplyMarkup: models.ReplyKeyboardMarkup{
+			OneTimeKeyboard: true,
+			Keyboard: [][]models.KeyboardButton{
+				{
+					{Text: "first keyboard button"},
+					{Text: "second keyboard button"},
+				},
+				{
+					{Text: "third"},
+				},
+			},
+		},
+	})
+}
+
+func (m *MasterImpl) SetMenuButtons() {
+	ctx := context.Background()
+	params := &bot.SetChatMenuButtonParams{
+		MenuButton: models.MenuButtonCommands{Type: models.MenuButtonTypeCommands}, // Example: Using default menu button
+	}
+	ok, err := m.b.SetChatMenuButton(ctx, params)
+
+	if err != nil {
+		log.Fatalf("Error setting menu button: %v", err)
+		return
+	}
+	log.Printf("Set Menu Button: %v", ok)
+
 }
