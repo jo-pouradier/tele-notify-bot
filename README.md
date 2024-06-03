@@ -10,14 +10,21 @@ Create a Master-Agent pattern communicating by gRPC in golang. Why ? Because I k
 
 ## Plan
 
-- [ ] Create the agent with the gRPC communication, may test with python scripts.
+**gRPC**:
+ - [ ] Create the agent with the gRPC communication, may test with python scripts.
    > Note that these agents will be **gRPC servers** and the master will send requests to them. 
-- [ ] Connect agent to the master so he can know who is connected. (gave custom name or hostname)
-- [ ] Create the bot commands via the master.
-- [ ] System to have command with steps: /metrics -> which server ? Master send new buttons to select by the user, just like botFather with bot management.
+ - [ ] Connect agent to the master so he can know who is connected. (gave custom name or hostname)
 
-- [ ] How to easily manage commands/function associated ? map ? objects ?
+**BOT**:
+ - [ ] How to easily manage commands/function associated ? map ? struct ?
+ - [ ] System to have command with steps: /metrics -> which server ? Master send new buttons to select by the user, just like botFather with bot management.
+
+- [ ] Create/match the bot commands via the master to grpc communication.
 
 ## Interactions
 
-The combinations of menu button (a list of all commands available) and of keyboard button when multiple choices are possible. The usage of CallbackQueries is to set parameters or anything that doesnt need a chat response.
+The combinations of menu button (a list of all commands available) and of keyboard button when multiple choices are possible. The usage of CallbackQueries is not meant to respond something in the chat (according to telegram doc), but we still have the corresponding message so it's still possible to respond something! Great. With this InlineKeyboard with their callback maybe the best way to chaine messages.
+
+One way I can think about is:
+ - commands, available by menu button
+ - response with InlineButton, with specifique Callback (only 64 char long)
