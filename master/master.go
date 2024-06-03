@@ -101,9 +101,22 @@ func handlerDef(ctx context.Context, b *bot.Bot, update *models.Update) {
 
 func handlerCallback(ctx context.Context, b *bot.Bot, update *models.Update) {
 	b.AnswerCallbackQuery(ctx, &bot.AnswerCallbackQueryParams{
+
 		CallbackQueryID: update.CallbackQuery.ID,
 		Text:            "ok",
 		// ShowAlert:       true,
+	})
+	log.Printf("Message from Callback inaccessible: %+v", update.CallbackQuery.Message.InaccessibleMessage)
+	log.Printf("Message from Callback: %+v", update.CallbackQuery.Message.Message)
+	msg := update.CallbackQuery.Message.Message
+	if msg == nil {
+		return
+	}
+
+	b.SendMessage(ctx, &bot.SendMessageParams{
+		ChatID:          msg.Chat.ID,
+		Text:            "wow",
+		ReplyParameters: &models.ReplyParameters{MessageID: msg.ID},
 	})
 }
 
