@@ -8,22 +8,36 @@ import (
 
 	pb "github.com/jo-pouradier/homelab-bot/grpc"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-const (
-	defaultName = "world"
-)
-
 var (
-	addr = flag.String("addr", "localhost:50051", "the address to connect to")
-	name = flag.String("name", defaultName, "Name to greet")
+	addr               = flag.String("addr", "localhost:50051", "the address to connect to like hostname:port")
+	tls                = flag.Bool("tls", false, "Connection uses TLS if true, else plain TCP")
+	caFile             = flag.String("ca_file", "", "The file containing the CA root cert file")
+	serverHostOverride = flag.String("server_host_override", "test.tbot.jo-pouradier.fr", "The server name used to verify the hostname returned by the TLS handshake")
 )
 
 func main() {
 	flag.Parse()
 
-	conn, err := grpc.NewClient(*addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	var opts []grpc.DialOption
+	if *tls {
+		if *caFile == "" {
+			*caFile = "./x509/ca_cert.pem"
+		}
+		creds, err := credentials.NewClientTLSFromFile(*caFile, *serverHostOverride)
+		if err != nil {
+			log.Fatalf("Failed to create TLS credentials: %v", err)
+		}
+		opts = append(opts, grpc.WithTransportCredentials(creds))
+	} else {
+		log.Print("WARNING using insecure connection")
+		opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	}
+
+	conn, err := grpc.NewClient(*addr, opts...)
 
 	if err != nil {
 		log.Fatalf("Erro creating new Client: %v", err)

@@ -6,8 +6,8 @@ import (
 	"net"
 
 	pb "github.com/jo-pouradier/homelab-bot/grpc"
-
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 )
 
 type Agent interface {
@@ -19,13 +19,39 @@ type AgentImpl struct {
 	s   *grpc.Server
 }
 
-func NewAgent(port int) *AgentImpl {
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
+type NewAgentParams struct {
+	Port     int
+	Tls      bool
+	CertFile string
+	KeyFile  string
+}
+
+func NewAgent(params NewAgentParams) *AgentImpl {
+	if params.Port == 0 {
+		params.Port = 50000
+	}
+	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", params.Port))
 
 	if err != nil {
 		log.Fatalf("Could not open port: %v", err)
 	}
-	s := grpc.NewServer()
+
+	var opts []grpc.ServerOption
+	if params.Tls {
+		if params.CertFile == "" {
+			params.CertFile = "./x509/server_cert.pem"
+		}
+		if params.KeyFile == "" {
+			params.KeyFile = "x509/server_key.pem"
+		}
+		creds, err := credentials.NewServerTLSFromFile(params.CertFile, params.KeyFile)
+		if err != nil {
+			log.Fatalf("Failed to generate credentials: %v", err)
+		}
+		opts = []grpc.ServerOption{grpc.Creds(creds)}
+	}
+	s := grpc.NewServer(opts...)
+	// s := grpc.NewServer()
 
 	pb.RegisterGreetingServiceServer(s, &PingServerImpl{})
 	pb.RegisterMetricsServiceServer(s, &MetricsServerImpl{})
