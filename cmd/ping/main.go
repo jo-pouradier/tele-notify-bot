@@ -7,9 +7,12 @@ import (
 	"time"
 
 	pb "github.com/jo-pouradier/homelab-bot/grpc"
+	"golang.org/x/oauth2"
+	// "golang.org/x/oauth2"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/credentials/oauth"
 )
 
 var (
@@ -32,6 +35,9 @@ func main() {
 			log.Fatalf("Failed to create TLS credentials: %v", err)
 		}
 		opts = append(opts, grpc.WithTransportCredentials(creds))
+		// authentication
+		perRPC := oauth.TokenSource{TokenSource: oauth2.StaticTokenSource(fetchToken())}
+		opts = append(opts, grpc.WithPerRPCCredentials(perRPC))
 	} else {
 		log.Print("WARNING using insecure connection")
 		opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
@@ -40,7 +46,7 @@ func main() {
 	conn, err := grpc.NewClient(*addr, opts...)
 
 	if err != nil {
-		log.Fatalf("Erro creating new Client: %v", err)
+		log.Fatalf("Error connectiong to server: %v", err)
 	}
 	defer conn.Close()
 
@@ -63,4 +69,10 @@ func main() {
 	metrics, _ := m.Metrics(metricsCtx, &pb.Empty{})
 	log.Printf("get metrics: %s", metrics)
 
+}
+
+func fetchToken() *oauth2.Token {
+	return &oauth2.Token{
+		AccessToken: "some-secret-token",
+	}
 }

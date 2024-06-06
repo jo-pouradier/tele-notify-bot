@@ -1,5 +1,8 @@
 # My telegram bot to get homelab notification
 
+Part of this project are higly inspired from [grpc-go examples](https://github.com/grpc/grpc-go/tree/master/examples)
+
+
 ## Goal
 
 After some issue with my Raspberry Pi, AKA Cpu throttle, I wanted a way to get notification and metrics of my servers of my homelab.  
@@ -11,9 +14,11 @@ Create a Master-Agent pattern communicating by gRPC in golang. Why ? Because I k
 ## Plan
 
 **gRPC**:
- - [ ] Create the agent with the gRPC communication, may test with python scripts.
+ - [x] Add Tls
+ - [x] Add authentication
+ - [x] Create the agent with the gRPC communication, may test with python scripts.
    > Note that these agents will be **gRPC servers** and the master will send requests to them. 
- - [ ] Connect agent to the master so he can know who is connected. (gave custom name or hostname)
+ - [ ] Connect agent to the master so he can know who is connected via metadata.
 
 **BOT**:
  - [ ] How to easily manage commands/function associated ? map ? struct ?
@@ -28,3 +33,7 @@ The combinations of menu button (a list of all commands available) and of keyboa
 One way I can think about is:
  - commands, available by menu button
  - response with InlineButton, with specifique Callback (only 64 char long)
+
+## Registration
+
+We ask for a new key to the master, give this key to the agent, the agent connect to themaster with some metadata like server name, version, status(?), methods(?). The master accept the connection based on the token and register this agent based on the metadata.
