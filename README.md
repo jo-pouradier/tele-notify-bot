@@ -5,7 +5,7 @@ Part of this project are higly inspired from [grpc-go examples](https://github.c
 
 ## Goal
 
-After some issue with my Raspberry Pi, AKA Cpu throttle, I wanted a way to get notification and metrics of my servers of my homelab.  
+After some issue with my Raspberry Pi, AKA Cpu throttling, I wanted a way to get notification and metrics of my servers of my homelab.  
 There is some way to have it with well known softwares. But it is funnier to build it from scratch.  
 
 Here is the plan:  
@@ -17,7 +17,7 @@ Create a Master-Agent pattern communicating by gRPC in golang. Why ? Because I k
  - [x] Add Tls
  - [x] Add authentication
  - [x] Create the agent with the gRPC communication, may test with python scripts.
-   > Note that these agents will be **gRPC servers** and the master will send requests to them. 
+   > Note that these agents will be **gRPC servers** and the master will send requests to them [See Update on this](#architecture-issue). 
  - [ ] Connect agent to the master so he can know who is connected via metadata.
 
 **BOT**:
@@ -37,3 +37,8 @@ One way I can think about is:
 ## Registration
 
 We ask for a new key to the master, give this key to the agent, the agent connect to themaster with some metadata like server name, version, status(?), methods(?). The master accept the connection based on the token and register this agent based on the metadata.
+
+## Architecture Issue
+
+The agent beeing a server implise that one port must be openned and that the server is accessible on this port, the agent should have his own TLS keys + more work on master to register and manage each agent.  
+Opening a port is a problem if we want to manage servers in a private network and that the master cant be on this same network. Only the master should be a server and the agent initiate a long pooling request or a bidirectional stream (I'll go for the stream).
