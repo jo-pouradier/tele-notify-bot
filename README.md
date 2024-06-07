@@ -42,3 +42,4 @@ We ask for a new key to the master, give this key to the agent, the agent connec
 
 The agent beeing a server implise that one port must be openned and that the server is accessible on this port, the agent should have his own TLS keys + more work on master to register and manage each agent.  
 Opening a port is a problem if we want to manage servers in a private network and that the master cant be on this same network. Only the master should be a server and the agent initiate a long pooling request or a bidirectional stream (I'll go for the stream).
+Plus this way the agent can send a struct of all data vailable. Much easier to manage.
