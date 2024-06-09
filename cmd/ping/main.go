@@ -4,7 +4,6 @@ import (
 	"flag"
 
 	"github.com/jo-pouradier/homelab-bot/agent"
-	"golang.org/x/oauth2"
 )
 
 var (
