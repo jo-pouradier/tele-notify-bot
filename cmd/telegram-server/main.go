@@ -3,7 +3,7 @@ package main
 import (
 	"flag"
 
-	"github.com/jo-pouradier/homelab-bot/master"
+	"github.com/jo-pouradier/homelab-bot/bot"
 	"github.com/joho/godotenv"
 )
 
@@ -15,6 +15,6 @@ func init() {
 }
 
 func main() {
-	master := master.NewMaster(*debug)
+	master := bot.NewBotServer(*debug)
 	master.Serve()
 }

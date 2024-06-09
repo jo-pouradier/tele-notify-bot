@@ -3,7 +3,7 @@ package main
 import (
 	"flag"
 
-	"github.com/jo-pouradier/homelab-bot/agent"
+	"github.com/jo-pouradier/homelab-bot/master"
 )
 
 var (
@@ -16,7 +16,7 @@ var (
 func main() {
 	flag.Parse()
 
-	a := agent.NewAgent(agent.NewAgentParams{
+	a := master.NewMaster(master.NewMasterParams{
 		Port:     *port,
 		Tls:      *tls,
 		CertFile: *certFile,

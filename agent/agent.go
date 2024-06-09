@@ -2,123 +2,74 @@ package agent
 
 import (
 	"context"
-	"crypto/tls"
-	"fmt"
 	"log"
-	"net"
-	"strings"
+	"time"
 
 	pb "github.com/jo-pouradier/homelab-bot/grpc"
+	"golang.org/x/oauth2"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
-	"google.golang.org/grpc/metadata"
-	"google.golang.org/grpc/status"
+	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/credentials/oauth"
 )
-
-var (
-	errMissingMetadata = status.Errorf(codes.InvalidArgument, "missing metadata")
-	errInvalidToken    = status.Errorf(codes.Unauthenticated, "invalid token")
-)
-
-type Agent interface {
-	Serve()
-}
 
 type AgentImpl struct {
-	lis net.Listener
-	s   *grpc.Server
+	conn *grpc.ClientConn
 }
 
 type NewAgentParams struct {
-	Port     int
-	Tls      bool
-	CertFile string
-	KeyFile  string
+	Addr               string
+	Tls                bool
+	CaFile             string
+	Token              string
+	ServerHostOverride string
 }
 
-func NewAgent(params NewAgentParams) *AgentImpl {
-	if params.Port == 0 {
-		params.Port = 50000
+func NewAgent(params NewAgentParams) (AgentImpl, error) {
+	var opts []grpc.DialOption
+	if params.Tls {
+		if params.CaFile == "" {
+			params.CaFile = "./x509/ca_cert.pem"
+		}
+		creds, err := credentials.NewClientTLSFromFile(params.CaFile, params.ServerHostOverride)
+		if err != nil {
+			log.Fatalf("Failed to create TLS credentials: %v", err)
+		}
+		opts = append(opts, grpc.WithTransportCredentials(creds))
+		// authentication
+		perRPC := oauth.TokenSource{TokenSource: oauth2.StaticTokenSource(&oauth2.Token{AccessToken: params.Token})}
+		opts = append(opts, grpc.WithPerRPCCredentials(perRPC))
+	} else {
+		log.Print("WARNING using insecure connection")
+		opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	}
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", params.Port))
+
+	conn, err := grpc.NewClient(params.Addr, opts...)
 
 	if err != nil {
-		log.Fatalf("Could not open port: %v", err)
+		log.Fatalf("Error connectiong to server: %v", err)
 	}
+	defer conn.Close()
 
-	var opts []grpc.ServerOption
-	if params.Tls {
-		if params.CertFile == "" {
-			params.CertFile = "./x509/server_cert.pem"
-		}
-		if params.KeyFile == "" {
-			params.KeyFile = "x509/server_key.pem"
-		}
-		certs, err := tls.LoadX509KeyPair(params.CertFile, params.KeyFile)
-		if err != nil {
-			log.Fatalf("failed to load key pair: %s", err)
-		}
-		// creds, err := credentials.NewServerTLSFromFile(params.CertFile, params.KeyFile)
-		// if err != nil {
-		// 	log.Fatalf("Failed to generate credentials: %v", err)
-		// }
-		creds := credentials.NewServerTLSFromCert(&certs)
+	c := pb.NewGreetingServiceClient(conn)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
 
-		opts = []grpc.ServerOption{
-			grpc.UnaryInterceptor(ensureValidToken),
-			grpc.Creds(creds),
-		}
-	} else {
-		log.Print("WARNING your are not using tls Encryption, don't send any sensitive data")
+	res, err := c.Ping(ctx, &pb.PingRequest{Name: "ping"})
+	if err != nil {
+		log.Fatalf("Error with rpc request: %v", err)
 	}
-	s := grpc.NewServer(opts...)
-	// s := grpc.NewServer()
+	log.Printf("ping 1 with txt=ping: %v", res)
 
-	pb.RegisterGreetingServiceServer(s, &PingServerImpl{})
-	pb.RegisterMetricsServiceServer(s, &MetricsServerImpl{})
+	res2, _ := c.Ping(ctx, &pb.PingRequest{Name: "test"})
+	log.Printf("ping 2 with txt=test: %v", res2)
 
-	return &AgentImpl{
-		lis: lis,
-		s:   s,
-	}
+	m := pb.NewMetricsServiceClient(conn)
+	metricsCtx, metricsCancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer metricsCancel()
+	metrics, _ := m.Metrics(metricsCtx, &pb.Empty{})
+	log.Printf("get metrics: %s", metrics)
 
-}
+	return AgentImpl{conn: conn}, nil
 
-func (a *AgentImpl) Serve() {
-	log.Printf("Server listening at %v", a.lis.Addr())
-	if err := a.s.Serve(a.lis); err != nil {
-		log.Fatalf("failed to serve: %v", err)
-	}
-}
-
-// valid validates the authorization.
-func valid(authorization []string) bool {
-	if len(authorization) < 1 {
-		return false
-	}
-	token := strings.TrimPrefix(authorization[0], "Bearer ")
-	// Perform the token validation here. For the sake of this example, the code
-	// here forgoes any of the usual OAuth2 token validation and instead checks
-	// for a token matching an arbitrary string.
-	return token == "some-secret-token"
-}
-
-// ensureValidToken ensures a valid token exists within a request's metadata. If
-// the token is missing or invalid, the interceptor blocks execution of the
-// handler and returns an error. Otherwise, the interceptor invokes the unary
-// handler.
-func ensureValidToken(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
-	md, ok := metadata.FromIncomingContext(ctx)
-	if !ok {
-		return nil, errMissingMetadata
-	}
-	log.Printf("Metadata: %+v", md)
-	// The keys within metadata.MD are normalized to lowercase.
-	// See: https://godoc.org/google.golang.org/grpc/metadata#New
-	if !valid(md["authorization"]) {
-		return nil, errInvalidToken
-	}
-	// Continue execution of handler after ensuring a valid token.
-	return handler(ctx, req)
 }

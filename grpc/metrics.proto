@@ -9,10 +9,20 @@ option go_package = "github.com/homelab-bot/grpc";
 
 service MetricsService {
 	rpc Metrics (Empty) returns (MetricsAllResponse) {}
+	rpc GetMetricsStream(stream MetricsData) returns (stream AskMetrics) {}
 }
 
 message MetricsAllResponse {
 	string metrics = 1;
+}
+
+message MetricsData {
+	int32 cpu_percent_usage = 1;
+	int32 mem_percent_usage = 2;
+}
+
+message AskMetrics {
+	bool ask_metrics = 1;
 }
 
 message Empty {}
