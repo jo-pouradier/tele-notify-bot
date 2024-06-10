@@ -1,52 +1,32 @@
 package main
 
 import (
-	"context"
 	"flag"
-	"log"
-	"time"
 
-	pb "github.com/jo-pouradier/homelab-bot/grpc"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
-)
-
-const (
-	defaultName = "world"
+	"github.com/jo-pouradier/homelab-bot/agent"
 )
 
 var (
-	addr = flag.String("addr", "localhost:50051", "the address to connect to")
-	name = flag.String("name", defaultName, "Name to greet")
+	Address            = flag.String("addr", "localhost:50051", "the address to connect to like hostname:port")
+	Tls                = flag.Bool("tls", false, "Connection uses TLS if true, else plain TCP")
+	CaFile             = flag.String("ca_file", "./x509/ca_cert.pem", "The file containing the CA root cert file")
+	ServerHostOverride = flag.String("server_host_override", "test.tbot.jo-pouradier.fr", "The server name used to verify the hostname returned by the TLS handshake")
 )
 
 func main() {
 	flag.Parse()
 
-	conn, err := grpc.NewClient(*addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	params := agent.NewAgentParams{
+		Addr:               *Address,
+		Tls:                *Tls,
+		CaFile:             *CaFile,
+		Token:              "some-secret-token",
+		ServerHostOverride: *ServerHostOverride,
+	}
+
+	_, err := agent.NewAgent(params)
 
 	if err != nil {
-		log.Fatalf("Erro creating new Client: %v", err)
+		return
 	}
-	defer conn.Close()
-
-	c := pb.NewGreetingServiceClient(conn)
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-
-	res, err := c.Ping(ctx, &pb.PingRequest{Name: "ping"})
-	if err != nil {
-		log.Fatalf("Error with rpc request: %v", err)
-	}
-	log.Printf("ping 1 with txt=ping: %v", res)
-
-	res2, _ := c.Ping(ctx, &pb.PingRequest{Name: "test"})
-	log.Printf("ping 2 with txt=test: %v", res2)
-
-	m := pb.NewMetricsServiceClient(conn)
-	metricsCtx, metricsCancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer metricsCancel()
-	metrics, _ := m.Metrics(metricsCtx, &pb.Empty{})
-	log.Printf("get metrics: %s", metrics)
-
 }

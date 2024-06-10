@@ -1,45 +1,98 @@
 package agent
 
 import (
-	"fmt"
+	"context"
 	"log"
-	"net"
+	"time"
 
 	pb "github.com/jo-pouradier/homelab-bot/grpc"
-
+	"github.com/jo-pouradier/homelab-bot/metrics"
+	"golang.org/x/oauth2"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/credentials/oauth"
 )
 
-type Agent interface {
-	Serve()
-}
-
 type AgentImpl struct {
-	lis net.Listener
-	s   *grpc.Server
+	conn *grpc.ClientConn
 }
 
-func NewAgent(port int) *AgentImpl {
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
+type NewAgentParams struct {
+	Addr               string
+	Tls                bool
+	CaFile             string
+	Token              string
+	ServerHostOverride string
+}
+
+func NewAgent(params NewAgentParams) (AgentImpl, error) {
+	var opts []grpc.DialOption
+	if params.Tls {
+		if params.CaFile == "" {
+			params.CaFile = "./x509/ca_cert.pem"
+		}
+		creds, err := credentials.NewClientTLSFromFile(params.CaFile, params.ServerHostOverride)
+		if err != nil {
+			log.Fatalf("Failed to create TLS credentials: %v", err)
+		}
+		opts = append(opts, grpc.WithTransportCredentials(creds))
+		// authentication
+		perRPC := oauth.TokenSource{TokenSource: oauth2.StaticTokenSource(&oauth2.Token{AccessToken: params.Token})}
+		opts = append(opts, grpc.WithPerRPCCredentials(perRPC))
+	} else {
+		log.Print("WARNING using insecure connection")
+		opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	}
+
+	conn, err := grpc.NewClient(params.Addr, opts...)
 
 	if err != nil {
-		log.Fatalf("Could not open port: %v", err)
+		log.Fatalf("Error connectiong to server: %v", err)
 	}
-	s := grpc.NewServer()
+	defer conn.Close()
 
-	pb.RegisterGreetingServiceServer(s, &PingServerImpl{})
-	pb.RegisterMetricsServiceServer(s, &MetricsServerImpl{})
+	c := pb.NewGreetingServiceClient(conn)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
 
-	return &AgentImpl{
-		lis: lis,
-		s:   s,
+	res, err := c.Ping(ctx, &pb.PingRequest{Name: "ping"})
+	if err != nil {
+		log.Fatalf("Error with rpc request: %v", err)
 	}
+	log.Printf("ping 1 with txt=ping: %v", res)
+
+	res2, _ := c.Ping(ctx, &pb.PingRequest{Name: "test"})
+	log.Printf("ping 2 with txt=test: %v", res2)
+
+	m := pb.NewMetricsServiceClient(conn)
+	metricsCtx, metricsCancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer metricsCancel()
+	metrics, _ := m.Metrics(metricsCtx, &pb.Empty{})
+	log.Printf("get metrics: %s", metrics)
+
+	StreamMetrics(conn)
+
+	return AgentImpl{conn: conn}, nil
 
 }
 
-func (a *AgentImpl) Serve() {
-	log.Printf("Server listening at %v", a.lis.Addr())
-	if err := a.s.Serve(a.lis); err != nil {
-		log.Fatalf("failed to serve: %v", err)
+func StreamMetrics(conn *grpc.ClientConn) {
+	ctx := context.WithoutCancel(context.Background())
+
+	client := pb.NewMetricsServiceClient(conn)
+
+	for {
+		stream, _ := client.GetMetricsStream(ctx, grpc.EmptyCallOption{})
+		cpu, _ := metrics.GetCPU1()
+		mem, _ := metrics.GetMEM1()
+		log.Printf("New data cpu: %.2f, mem: %.2f", cpu, mem)
+		if err := stream.Send(&pb.MetricsData{CpuPercentUsage: float32(cpu), MemPercentUsage: float32(mem)}); err != nil {
+			log.Fatalf("error sending data: cpu: %.2f, mem: %.2f", cpu, mem)
+		}
+		res, _ := stream.Recv()
+		if !res.AskMetrics {
+			break
+		}
 	}
 }

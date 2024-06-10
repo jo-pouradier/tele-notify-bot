@@ -8,7 +8,7 @@ import (
 )
 
 func GetCPU1() (float64, error) {
-	c, err := cpu.Percent(1*time.Second, false)
+	c, err := cpu.Percent(100*time.Millisecond, false)
 	if err != nil {
 		return 0, err
 	}

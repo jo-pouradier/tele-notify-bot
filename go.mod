@@ -6,6 +6,7 @@ require (
 	github.com/go-telegram/bot v1.4.0
 	github.com/joho/godotenv v1.5.1
 	github.com/shirou/gopsutil/v3 v3.24.4
+	golang.org/x/oauth2 v0.20.0
 	google.golang.org/grpc v1.64.0
 	google.golang.org/protobuf v1.34.1
 // github.com/shirou/gopsutil/v3/cpu v3.24.4
@@ -13,6 +14,7 @@ require (
 )
 
 require (
+	cloud.google.com/go/compute/metadata v0.3.0 // indirect
 	github.com/go-ole/go-ole v1.2.6 // indirect
 	github.com/lufia/plan9stats v0.0.0-20211012122336-39d0f177ccd0 // indirect
 	github.com/power-devops/perfstat v0.0.0-20210106213030-5aafc221ea8c // indirect
