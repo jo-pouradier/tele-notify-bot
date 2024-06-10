@@ -43,7 +43,7 @@ func (s *MetricsServerImpl) GetMetricsStream(streamMetrics pb.MetricsService_Get
 
 		log.Printf("Data stream: %+v", in)
 
-		time.Sleep(time.Second)
+		time.Sleep(5 * time.Second)
 		streamMetrics.Send(&pb.AskMetrics{AskMetrics: true})
 	}
 

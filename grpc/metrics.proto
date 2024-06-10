@@ -17,8 +17,8 @@ message MetricsAllResponse {
 }
 
 message MetricsData {
-	int32 cpu_percent_usage = 1;
-	int32 mem_percent_usage = 2;
+	float cpu_percent_usage = 1;
+	float mem_percent_usage = 2;
 }
 
 message AskMetrics {

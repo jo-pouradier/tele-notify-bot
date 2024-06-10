@@ -6,6 +6,7 @@ import (
 	"time"
 
 	pb "github.com/jo-pouradier/homelab-bot/grpc"
+	"github.com/jo-pouradier/homelab-bot/metrics"
 	"golang.org/x/oauth2"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -70,6 +71,28 @@ func NewAgent(params NewAgentParams) (AgentImpl, error) {
 	metrics, _ := m.Metrics(metricsCtx, &pb.Empty{})
 	log.Printf("get metrics: %s", metrics)
 
+	StreamMetrics(conn)
+
 	return AgentImpl{conn: conn}, nil
 
+}
+
+func StreamMetrics(conn *grpc.ClientConn) {
+	ctx := context.WithoutCancel(context.Background())
+
+	client := pb.NewMetricsServiceClient(conn)
+
+	for {
+		stream, _ := client.GetMetricsStream(ctx, grpc.EmptyCallOption{})
+		cpu, _ := metrics.GetCPU1()
+		mem, _ := metrics.GetMEM1()
+		log.Printf("New data cpu: %.2f, mem: %.2f", cpu, mem)
+		if err := stream.Send(&pb.MetricsData{CpuPercentUsage: float32(cpu), MemPercentUsage: float32(mem)}); err != nil {
+			log.Fatalf("error sending data: cpu: %.2f, mem: %.2f", cpu, mem)
+		}
+		res, _ := stream.Recv()
+		if !res.AskMetrics {
+			break
+		}
+	}
 }
