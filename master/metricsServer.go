@@ -10,6 +10,7 @@ import (
 
 	pb "github.com/jo-pouradier/homelab-bot/grpc"
 	"github.com/jo-pouradier/homelab-bot/metrics"
+	"google.golang.org/grpc/metadata"
 )
 
 type MetricsServerImpl struct {
@@ -21,6 +22,10 @@ type MetricsServerImpl struct {
 
 func (s *MetricsServerImpl) Metrics(ctx context.Context, in *pb.Empty) (*pb.MetricsAllResponse, error) {
 	log.Printf("Received: %v", in)
+	md, ok := metadata.FromIncomingContext(ctx)
+	if ok {
+		log.Printf("metadata from client: %+v", md)
+	}
 	cpu, _ := metrics.GetCPU1()
 	mem, _ := metrics.GetMEM1()
 
@@ -37,6 +42,12 @@ func (s *MetricsServerImpl) GetMetricsStream(streamMetrics pb.MetricsService_Get
 		if err != nil {
 			return err
 		}
+		// read metadata
+		md, ok := metadata.FromIncomingContext(streamMetrics.Context())
+		if ok {
+			log.Printf("metadata from client: %+v", md)
+		}
+
 		s.mu.Lock()
 		s.metrics = in
 		s.mu.Unlock()

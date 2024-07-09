@@ -12,6 +12,7 @@ import (
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/credentials/oauth"
+	"google.golang.org/grpc/metadata"
 )
 
 type AgentImpl struct {
@@ -56,6 +57,9 @@ func NewAgent(params NewAgentParams) (AgentImpl, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 
+	// add metadata
+	ctx = metadata.AppendToOutgoingContext(ctx, "name", "metadata_name_testing")
+
 	res, err := c.Ping(ctx, &pb.PingRequest{Name: "ping"})
 	if err != nil {
 		log.Fatalf("Error with rpc request: %v", err)
@@ -79,6 +83,7 @@ func NewAgent(params NewAgentParams) (AgentImpl, error) {
 
 func StreamMetrics(conn *grpc.ClientConn) {
 	ctx := context.WithoutCancel(context.Background())
+	ctx = metadata.AppendToOutgoingContext(ctx, "name", "metadata_name_testing", "data", "metrics")
 
 	client := pb.NewMetricsServiceClient(conn)
 

@@ -17,7 +17,7 @@ Create a Master-Agent pattern communicating by gRPC in golang. Why ? Because I k
  - [x] Add Tls
  - [x] Add authentication
  - [x] Create the agent with the gRPC communication, may test with python scripts.
-   > Note that these agents will be **gRPC servers** and the master will send requests to them [See Update on this](#architecture-issue). 
+   > ~~Note that these agents will be **gRPC servers** and the master will send requests to them~~ [See Update on this](#architecture-issue). 
  - [ ] Connect agent to the master so he can know who is connected via metadata.
 
 **BOT**:
