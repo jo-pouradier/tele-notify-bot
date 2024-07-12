@@ -3,8 +3,8 @@ package agent
 import (
 	"context"
 	"log"
-	"time"
 
+	"github.com/google/uuid"
 	pb "github.com/jo-pouradier/homelab-bot/grpc"
 	"github.com/jo-pouradier/homelab-bot/metrics"
 	"golang.org/x/oauth2"
@@ -15,8 +15,17 @@ import (
 	"google.golang.org/grpc/metadata"
 )
 
+type Agent interface {
+	Serve()
+	Ping(string)
+	StreamMetrics()
+}
+
 type AgentImpl struct {
-	conn *grpc.ClientConn
+	ctx           context.Context
+	conn          *grpc.ClientConn
+	PingClient    *pb.GreetingServiceClient
+	MetricsClient *pb.MetricsServiceClient
 }
 
 type NewAgentParams struct {
@@ -25,6 +34,7 @@ type NewAgentParams struct {
 	CaFile             string
 	Token              string
 	ServerHostOverride string
+	AgentName          string
 }
 
 func NewAgent(params NewAgentParams) (AgentImpl, error) {
@@ -47,48 +57,39 @@ func NewAgent(params NewAgentParams) (AgentImpl, error) {
 	}
 
 	conn, err := grpc.NewClient(params.Addr, opts...)
-
 	if err != nil {
 		log.Fatalf("Error connectiong to server: %v", err)
 	}
-	defer conn.Close()
 
-	c := pb.NewGreetingServiceClient(conn)
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
+	ctx := context.WithoutCancel(context.Background())
+	agentName := params.AgentName
+	if agentName == "" {
+		agentName = uuid.New().String()
+	}
+	ctx = metadata.AppendToOutgoingContext(ctx, "name", agentName)
 
-	// add metadata
-	ctx = metadata.AppendToOutgoingContext(ctx, "name", "metadata_name_testing")
+	return AgentImpl{
+		ctx:  ctx,
+		conn: conn,
+	}, nil
 
-	res, err := c.Ping(ctx, &pb.PingRequest{Name: "ping"})
+}
+
+func (agent *AgentImpl) Ping(msg string) {
+	pingClient := pb.NewGreetingServiceClient(agent.conn)
+	res, err := pingClient.Ping(agent.ctx, &pb.PingRequest{Name: msg})
 	if err != nil {
 		log.Fatalf("Error with rpc request: %v", err)
 	}
 	log.Printf("ping 1 with txt=ping: %v", res)
-
-	res2, _ := c.Ping(ctx, &pb.PingRequest{Name: "test"})
-	log.Printf("ping 2 with txt=test: %v", res2)
-
-	m := pb.NewMetricsServiceClient(conn)
-	metricsCtx, metricsCancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer metricsCancel()
-	metrics, _ := m.Metrics(metricsCtx, &pb.Empty{})
-	log.Printf("get metrics: %s", metrics)
-
-	StreamMetrics(conn)
-
-	return AgentImpl{conn: conn}, nil
-
 }
 
-func StreamMetrics(conn *grpc.ClientConn) {
-	ctx := context.WithoutCancel(context.Background())
-	ctx = metadata.AppendToOutgoingContext(ctx, "name", "metadata_name_testing", "data", "metrics")
-
-	client := pb.NewMetricsServiceClient(conn)
+func (agent *AgentImpl) StreamMetrics() {
+	ctx := metadata.AppendToOutgoingContext(agent.ctx, "name", "metadata_name_testing", "data", "metrics")
+	metricsClient := pb.NewMetricsServiceClient(agent.conn)
 
 	for {
-		stream, _ := client.GetMetricsStream(ctx, grpc.EmptyCallOption{})
+		stream, _ := metricsClient.GetMetricsStream(ctx, grpc.EmptyCallOption{})
 		cpu, _ := metrics.GetCPU1()
 		mem, _ := metrics.GetMEM1()
 		log.Printf("New data cpu: %.2f, mem: %.2f", cpu, mem)

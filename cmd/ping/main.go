@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"log"
 
 	"github.com/jo-pouradier/homelab-bot/agent"
 )
@@ -24,7 +25,15 @@ func main() {
 		ServerHostOverride: *ServerHostOverride,
 	}
 
-	_, err := agent.NewAgent(params)
+	agent, err := agent.NewAgent(params)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+	agent.Ping("test")
+	agent.Ping("ping")
+
+	agent.StreamMetrics()
 
 	if err != nil {
 		return
