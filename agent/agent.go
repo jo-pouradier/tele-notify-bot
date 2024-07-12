@@ -81,9 +81,13 @@ func (agent *AgentImpl) Ping(msg string) {
 	if err != nil {
 		log.Fatalf("Error with rpc request: %v", err)
 	}
-	log.Printf("ping 1 with txt=ping: %v", res)
+	log.Printf("ping with txt=%v, response: %v", msg, res)
 }
 
+// TODO:
+// add a retry strategy
+// run inside a goroutine
+// add mecanism to follow current status
 func (agent *AgentImpl) StreamMetrics() {
 	ctx := metadata.AppendToOutgoingContext(agent.ctx, "name", "metadata_name_testing", "data", "metrics")
 	metricsClient := pb.NewMetricsServiceClient(agent.conn)
