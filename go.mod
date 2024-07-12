@@ -4,6 +4,7 @@ go 1.22.3
 
 require (
 	github.com/go-telegram/bot v1.4.0
+	github.com/google/uuid v1.6.0
 	github.com/joho/godotenv v1.5.1
 	github.com/shirou/gopsutil/v3 v3.24.4
 	golang.org/x/oauth2 v0.20.0
