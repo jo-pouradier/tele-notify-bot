@@ -16,8 +16,9 @@ import (
 type MetricsServerImpl struct {
 	pb.UnimplementedMetricsServiceServer
 
-	mu      sync.Mutex // protects routeNotes
-	metrics *pb.MetricsData
+	mu *sync.Mutex
+
+	Agents map[string]*pb.MetricsData
 }
 
 func (s *MetricsServerImpl) Metrics(ctx context.Context, in *pb.Empty) (*pb.MetricsAllResponse, error) {
@@ -44,12 +45,17 @@ func (s *MetricsServerImpl) GetMetricsStream(streamMetrics pb.MetricsService_Get
 		}
 		// read metadata
 		md, ok := metadata.FromIncomingContext(streamMetrics.Context())
-		if ok {
-			log.Printf("metadata from client: %+v", md)
+		if !ok {
+			streamMetrics.Send(&pb.AskMetrics{AskMetrics: false})
+			continue
 		}
+		name := md.Get("name")[0]
+		log.Printf("get name agent: %s", name)
 
 		s.mu.Lock()
-		s.metrics = in
+		if _, ok := s.Agents[name]; !ok {
+			s.Agents[name] = in
+		}
 		s.mu.Unlock()
 
 		log.Printf("Data stream: %+v", in)

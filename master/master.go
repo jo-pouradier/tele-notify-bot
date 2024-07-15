@@ -3,10 +3,14 @@ package master
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"log"
 	"net"
+	"os"
 	"strings"
+	"sync"
+	"syscall"
 
 	pb "github.com/jo-pouradier/homelab-bot/grpc"
 	"google.golang.org/grpc"
@@ -19,6 +23,8 @@ import (
 var (
 	errMissingMetadata = status.Errorf(codes.InvalidArgument, "missing metadata")
 	errInvalidToken    = status.Errorf(codes.Unauthenticated, "invalid token")
+
+	PipeName = "/tmp/tele-notify-bot-serve"
 )
 
 type Master interface {
@@ -26,8 +32,11 @@ type Master interface {
 }
 
 type MasterImpl struct {
-	lis net.Listener
-	s   *grpc.Server
+	lis           net.Listener
+	Servers       *grpc.Server
+	MetricsServer *MetricsServerImpl
+	PipeName      string
+	mu            *sync.Mutex
 }
 
 type NewMasterParams struct {
@@ -76,19 +85,39 @@ func NewMaster(params NewMasterParams) *MasterImpl {
 	// s := grpc.NewServer()
 
 	pb.RegisterGreetingServiceServer(s, &PingServerImpl{})
-	pb.RegisterMetricsServiceServer(s, &MetricsServerImpl{})
+	metricsServer := &MetricsServerImpl{Agents: make(map[string]*pb.MetricsData), mu: &sync.Mutex{}}
+	pb.RegisterMetricsServiceServer(s, metricsServer)
 
 	return &MasterImpl{
-		lis: lis,
-		s:   s,
+		lis:           lis,
+		Servers:       s,
+		PipeName:      PipeName,
+		MetricsServer: metricsServer,
+		mu:            &sync.Mutex{},
 	}
 
 }
 
-func (a *MasterImpl) Serve() {
+func (a *MasterImpl) Serve(wg *sync.WaitGroup) error {
+	a.createNamedPipe()
+	wg.Done()
 	log.Printf("Server listening at %v", a.lis.Addr())
-	if err := a.s.Serve(a.lis); err != nil {
-		log.Fatalf("failed to serve: %v", err)
+	if err := a.Servers.Serve(a.lis); err != nil {
+		// log.Fatalf("failed to serve: %v", err)
+		return errors.New(fmt.Sprintf("failed to serve: %v", err))
+	}
+	return nil
+}
+
+func (a *MasterImpl) createNamedPipe() {
+	if err := syscall.Mkfifo(a.PipeName, 0660); err != nil {
+		log.Fatalf("failed to create named pipe: %v", err)
+	}
+}
+
+func (a *MasterImpl) DeleteNamedPipe() {
+	if err := os.Remove(a.PipeName); err != nil && !os.IsNotExist(err) {
+		log.Fatalf("failed to remove pipe %s: %v", a.PipeName, err)
 	}
 }
 
