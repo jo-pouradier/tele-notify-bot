@@ -3,9 +3,11 @@ module github.com/jo-pouradier/homelab-bot
 go 1.22.3
 
 require (
+	github.com/antonfisher/nested-logrus-formatter v1.3.1
 	github.com/go-telegram/bot v1.4.0
 	github.com/joho/godotenv v1.5.1
 	github.com/shirou/gopsutil/v3 v3.24.4
+	github.com/sirupsen/logrus v1.9.3
 	golang.org/x/oauth2 v0.20.0
 	google.golang.org/grpc v1.64.0
 	google.golang.org/protobuf v1.34.1

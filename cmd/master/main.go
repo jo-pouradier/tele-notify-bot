@@ -3,8 +3,8 @@ package main
 import (
 	"flag"
 
-	"github.com/jo-pouradier/homelab-bot/logger"
 	"github.com/jo-pouradier/homelab-bot/master"
+	"github.com/jo-pouradier/homelab-bot/utils"
 )
 
 var (
@@ -15,7 +15,7 @@ var (
 )
 
 func init() {
-	logger.InitLogger(logger.DEBUG)
+	utils.InitLogger()
 }
 
 func main() {

@@ -9,8 +9,8 @@ import (
 	"time"
 
 	pb "github.com/jo-pouradier/homelab-bot/grpc"
-	"github.com/jo-pouradier/homelab-bot/logger"
 	"github.com/jo-pouradier/homelab-bot/metrics"
+	"github.com/jo-pouradier/homelab-bot/utils"
 )
 
 type MetricsServerImpl struct {
@@ -42,8 +42,7 @@ func (s *MetricsServerImpl) GetMetricsStream(streamMetrics pb.MetricsService_Get
 		s.metrics = in
 		s.mu.Unlock()
 
-		// log.Printf("Data stream: %+v", in)
-		logger.Debug("Data stream: %+v", in)
+		utils.Logger.Infof("Data stream: %+v", in)
 
 		time.Sleep(5 * time.Second)
 		streamMetrics.Send(&pb.AskMetrics{AskMetrics: true})
