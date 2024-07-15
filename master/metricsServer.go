@@ -35,33 +35,50 @@ func (s *MetricsServerImpl) Metrics(ctx context.Context, in *pb.Empty) (*pb.Metr
 }
 
 func (s *MetricsServerImpl) GetMetricsStream(streamMetrics pb.MetricsService_GetMetricsStreamServer) error {
+	ctx, cancel := context.WithCancel(streamMetrics.Context())
+	defer cancel()
+
+	// read metadata
+	md, ok := metadata.FromIncomingContext(streamMetrics.Context())
+	if !ok {
+		return fmt.Errorf("missing metadata")
+	}
+
+	name := md.Get("name")[0]
+	log.Printf("get name agent: %s", name)
+	s.mu.Lock()
+	s.Agents[name] = &pb.MetricsData{}
+	s.mu.Unlock()
+
+	go func() {
+		<-ctx.Done()
+		s.mu.Lock()
+		delete(s.Agents, name)
+		s.mu.Unlock()
+		log.Printf("Agent disconnected: %s", name)
+	}()
+
 	for {
 		in, err := streamMetrics.Recv()
 		if err == io.EOF {
 			return nil
 		}
 		if err != nil {
+			cancel()
 			return err
 		}
-		// read metadata
-		md, ok := metadata.FromIncomingContext(streamMetrics.Context())
-		if !ok {
-			streamMetrics.Send(&pb.AskMetrics{AskMetrics: false})
-			continue
-		}
-		name := md.Get("name")[0]
-		log.Printf("get name agent: %s", name)
 
 		s.mu.Lock()
-		if _, ok := s.Agents[name]; !ok {
-			s.Agents[name] = in
-		}
+		s.Agents[name] = in
 		s.mu.Unlock()
 
-		log.Printf("Data stream: %+v", in)
+		log.Printf("Data stream from %s: %+v", name, in)
 
 		time.Sleep(5 * time.Second)
-		streamMetrics.Send(&pb.AskMetrics{AskMetrics: true})
+		if err := streamMetrics.Send(&pb.AskMetrics{AskMetrics: true}); err != nil {
+			cancel()
+			return err
+		}
 	}
 
 }

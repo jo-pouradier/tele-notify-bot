@@ -91,18 +91,34 @@ func (agent *AgentImpl) Ping(msg string) {
 func (agent *AgentImpl) StreamMetrics() {
 	ctx := metadata.AppendToOutgoingContext(agent.ctx, "name", "metadata_name_testing", "data", "metrics")
 	metricsClient := pb.NewMetricsServiceClient(agent.conn)
+	stream, err := metricsClient.GetMetricsStream(ctx, grpc.EmptyCallOption{})
+	if err != nil {
+		log.Fatalf("failed to create stream: %v", err)
+	}
 
 	for {
-		stream, _ := metricsClient.GetMetricsStream(ctx, grpc.EmptyCallOption{})
 		cpu, _ := metrics.GetCPU1()
 		mem, _ := metrics.GetMEM1()
 		log.Printf("New data cpu: %.2f, mem: %.2f", cpu, mem)
+
 		if err := stream.Send(&pb.MetricsData{CpuPercentUsage: float32(cpu), MemPercentUsage: float32(mem)}); err != nil {
 			log.Fatalf("error sending data: cpu: %.2f, mem: %.2f", cpu, mem)
 		}
-		res, _ := stream.Recv()
+		res, err := stream.Recv()
+		if err != nil {
+			log.Printf("error receiving response: %v", err)
+			break
+		}
+
 		if !res.AskMetrics {
+			log.Println("Server requested to stop sending metrics, can be issue with metadata")
 			break
 		}
 	}
+
+	// Close the stream if the loop exits
+	if err := stream.CloseSend(); err != nil {
+		log.Printf("failed to close stream: %v", err)
+	}
+	log.Println("Agent metrics stream closed")
 }
